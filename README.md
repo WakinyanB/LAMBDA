@@ -3,7 +3,7 @@
 (Data & Codes for:)<br>
 **Evolution of virulence in emerging epidemics: from theory to experimental evolution and back**
 
-Wakinyan Benhamou, François Blanquart, Marc Choisy, Thomas W. Berngruber, Rémi Choquet and Sylvain Gandon<sup>&#x2020;</sup><br>
+Wakinyan Benhamou, François Blanquart, Marc Choisy, Thomas W. Berngruber, Rémi Choquet and Sylvain Gandon
 
 ## Data (source and short descriptions)
 
