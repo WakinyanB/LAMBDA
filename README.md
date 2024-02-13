@@ -13,11 +13,11 @@ The evolution experiment designed in [[Berngruber *et al.*, 2013](https://doi.or
 
 ### data_FACS.csv
 
-&#11169;&emsp; Times series of the (logit-)prevalence and viral strain (logit-)frequencies among infected cells (8 chemostats: 4 replicates x 2 treatments (epidemic *vs.* endemic)).
+&#11169;&emsp; Experimental times series of the (logit-)prevalence and viral strain (logit-)frequencies among infected cells (8 chemostats: 4 replicates x 2 treatments (epidemic *vs.* endemic)).
 
 ### data_qPCR.csv
 
-&#11169;&emsp; Times series of the viral strain (logit-)frequencies in the free virus stage (8 chemostats: 4 replicates x 2 treatments (epidemic *vs.* endemic)).
+&#11169;&emsp; Experimental times series of the viral strain (logit-)frequencies in the free virus stage (8 chemostats: 4 replicates x 2 treatments (epidemic *vs.* endemic)).
 
 ### Simulated_data/
 
