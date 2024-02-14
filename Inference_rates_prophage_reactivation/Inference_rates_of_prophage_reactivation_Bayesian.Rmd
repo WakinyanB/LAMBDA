@@ -1,0 +1,260 @@
+---
+title: 'Project \(\lambda\) - statistical inference of the rates of prophage reactivation (Bayesian approach)'
+author: "Wakinyan B."
+date: "07 April 2023"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+    number_sections: yes
+    highlight: tango
+  html_document:
+    toc: yes
+    toc_depth: '4'
+    df_print: paged
+header-includes:
+- \usepackage{stmaryrd}
+encoding: UTF-8
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      fig.align = "center",
+                      message = FALSE,
+                      warning = FALSE,
+                      results = 'show')
+
+knitr::opts_knit$set(root.dir='C:/Users/wbenhamou/Desktop/LAMBDA/Data_and_codes/')
+```
+\newpage
+
+```{r, results='hide'}
+rm(list=ls()) # Cleaning objects from the global environment
+
+# Packages (may first require installations: install.packages())
+library(tidyverse) # for data manipulation, graphic visualizations, ...
+library(plyr) # for data manipulation
+library(scales) # to manipulate the internal scaling infrastructure used by ggplot2
+library(RColorBrewer) # for colors and palettes
+library(gridExtra) # to show multiple plots
+library(cowplot) # to show multiple plots
+library(ggpubr) # to show multiple plots with a common legend
+library(deSolve) # to solve a system of ordinary differential equations
+library(boot) # for the logit and inverse logit function ('logit' and 'inv.logit')
+library(R2jags)
+library(mcmcplots)
+
+# Execute functions from external R script
+source("Phage_Lambda_functions_v11.R")
+
+Sys.setlocale("LC_TIME", "English")
+```
+# Functions for Bayesian inference
+
+```{r, eval=FALSE}
+model <- paste("
+    model{
+    
+    # Likelihoods
+    for(i in 1:n){
+      lnQ[i] ~ dnorm(log(alpha_m)-log(alpha_w), pow(sigma_Q,-2))
+      logit_g[i] ~ dnorm(treatment[prev0[i]] + chem[chemostat[i]] + (alpha_w-alpha_m)*time[i],
+                         pow(sigma_g,-2))
+    }
+    for(j in 1:Nchemostat){
+      chem[j] ~ dnorm(0, pow(gamma,-2))
+    }
+
+    # Priors
+    treatment[1] ~ dunif(0.25,3)     # epidemic
+    treatment[2] ~ dunif(-0.25,0.25) # endemic
+    
+    alpha_w ~ dunif(0,0.1)
+    alpha_m ~ dunif(0,0.1)
+    
+    sigma_Q ~ dunif(0,5)
+    sigma_g ~ dunif(0,1)
+    gamma ~ dunif(0,3)
+    }")
+writeLines(model, "model.txt")
+
+model_by_chemostat <- paste("
+    model{
+    
+    # Likelihoods
+    for(i in 1:n){
+      lnQ[i] ~ dnorm(log(alpha_m[chemostat[i]])-log(alpha_w[chemostat[i]]), pow(sigma_Q,-2))
+      logit_g[i] ~ dnorm(treatment[prev0[i]] + chem[chemostat[i]] +
+                         (alpha_w[chemostat[i]]-alpha_m[chemostat[i]])*time[i],
+                         pow(sigma_g,-2))
+    }
+    for(j in 1:Nchemostat){
+      chem[j] ~ dnorm(0, pow(gamma,-2))
+      
+      # Priors
+      alpha_w[j] ~ dunif(0,0.1)
+      alpha_m[j] ~ dunif(0,0.1)
+    }
+    
+    treatment[1] ~ dunif(0.25,3)     # epidemic
+    treatment[2] ~ dunif(-0.25,0.25) # endemic
+    
+    sigma_Q ~ dunif(0,5)
+    sigma_g ~ dunif(0,1)
+    gamma ~ dunif(0,3)
+    }")
+writeLines(model_by_chemostat, "model_by_chemostat.txt")
+```
+
+```{r}
+estim_alpha.bayesian <- function(data, threshold_prev=0.95, by_chemostat=TRUE,
+                                 Nchains=4, Niter=20000, Nburnin=8000, Nthin=50, seed=1234){
+  
+  tab <- data %>% ddply(~chemostat, function(X){
+    tmin <- X$time[which(inv.logit(X$logit_prev)>=threshold_prev)[1]]
+    return(subset(X, time>=tmin))})
+  
+  n <- nrow(tab)
+  Nchemostat <- length(unique(tab$chemostat))
+  
+  inits <- list()
+  
+  if(by_chemostat){
+    
+    set.seed(seed)
+    for(i in 1:Nchains){
+      rates <- runif(2*Nchemostat,0,0.03) %>% sort
+      inits[[i]] <- list("alpha_w"=rates[1:Nchemostat],
+                         "alpha_m"=rates[(Nchemostat+1):(2*Nchemostat)],
+                         "treatment"=c(runif(1,0.25,3), runif(1,-0.25,0.25)), "chem"=rnorm(Nchemostat),
+                         "sigma_Q"=runif(1), "sigma_g"=runif(1), "gamma"=runif(1))
+    }
+    
+   return(jags(data=list(n=n, Nchemostat=Nchemostat,
+                         logit_g=tab$logit_g, lnQ=tab$logit_q-tab$logit_g, time=tab$time,
+                         prev0=tab$prev0 %>% unique %>% sort %>% match(tab$prev0,.),
+                         chemostat=tab$chemostat %>% unique %>% sort %>% match(tab$chemostat,.)),
+               inits=inits, parameters.to.save=c("alpha_w","alpha_m","sigma_Q","sigma_g","gamma"),
+               model.file="model_by_chemostat.txt", n.chains=Nchains, n.iter=Niter, n.burnin=Nburnin, n.thin=Nthin))
+   }else{
+     
+    set.seed(seed)
+    for(i in 1:Nchains){
+      rates <- runif(2,0,0.03)
+      inits[[i]] <- list("alpha_w"=min(rates), "alpha_m"=max(rates),
+                         "treatment"=c(runif(1,0.25,3), runif(1,-0.25,0.25)), "chem"=rnorm(Nchemostat),
+                         "sigma_Q"=runif(1), "sigma_g"=runif(1), "gamma"=runif(1))
+    }
+     
+     return(jags(data=list(n=n, Nchemostat=Nchemostat,
+                           logit_g=tab$logit_g, lnQ=tab$logit_q-tab$logit_g, time=tab$time,
+                           prev0=tab$prev0 %>% unique %>% sort %>% match(tab$prev0,.),
+                           chemostat=tab$chemostat %>% unique %>% sort %>% match(tab$chemostat,.)),
+                 inits=inits, parameters.to.save=c("alpha_w","alpha_m","sigma_Q","sigma_g","gamma"),
+                 model.file="model.txt", n.chains=Nchains, n.iter=Niter, n.burnin=Nburnin, n.thin=Nthin))
+    }
+}
+```
+
+# Experimental data
+
+```{r}
+data_FACS <- read.csv("Data/data_FACS.csv", header = TRUE)
+data_qPCR <- read.csv("Data/data_qPCR.csv", header = TRUE)
+data <- merge.data.frame(data_FACS[,c(1:3,9:12)], data_qPCR[,c(1:3,6,8)], all=TRUE)
+```
+
+# Inference
+
+```{r, eval=FALSE}
+estim_alpha_exp <- estim_alpha.bayesian(data, by_chemostat = FALSE)
+estim_alpha_exp_by_chemostat <- estim_alpha.bayesian(data)
+
+# save(estim_alpha_exp, estim_alpha_exp_by_chemostat, file = "Inference_rates_prophage_reactivation/RJAGS_MCMC.RData")
+```
+
+# Results
+
+```{r}
+load("Inference_rates_prophage_reactivation/RJAGS_MCMC.RData")
+
+estim_alpha_exp
+estim_alpha_exp_by_chemostat
+
+# traceplot(estim_alpha_exp)
+# traceplot(estim_alpha_exp_by_chemostat)
+
+mcmc_exp <- as.mcmc(estim_alpha_exp)
+mcmc_exp_by_chemostat <- as.mcmc(estim_alpha_exp_by_chemostat)
+```
+## Plots
+
+```{r, fig.width=5, fig.height=4}
+df_exp <- rbind(mcmc_exp[[1]], mcmc_exp[[2]], mcmc_exp[[3]], mcmc_exp[[4]]) %>%
+  as.data.frame %>% tidyr::gather("parameter", "value")
+
+df_exp2 <- df_exp[grep("alpha", df_exp$parameter),]
+df_exp2$parameter <- factor(df_exp2$parameter, levels = c("alpha_w", "alpha_m"))
+
+colors <- c("forestgreen", "red")
+
+scientific_10 <- function(x){
+  return(sapply(x, function(x_i){
+    if(is.na(x_i)){
+      return("")
+    }else if(x_i==0){
+      return("0")
+    }else{
+      return(parse(text=gsub("e", " %*% 10^", scales::scientific_format()(x_i))))
+    }
+  }))
+}
+
+(Fig <- ggplot(df_exp2, aes(x=as.factor(parameter), y=value)) +
+    geom_violin(aes(fill=parameter), col='white', alpha=0.25) +
+    geom_boxplot(aes(col=parameter), width=0.15, outlier.size=0.25) +
+    labs(y="Estimated value\n") +
+    scale_fill_manual(values=colors) +
+    scale_color_manual(values=colors) +
+    scale_y_continuous(limits=c(0,1.75E-2), breaks=seq(0,1.75E-2,2.5E-3), labels=scientific_10) +
+    scale_x_discrete(label=c(expression(alpha[w]), expression(alpha[m]))) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(), axis.text.x = element_text(size=11),
+          axis.title.y = element_text(size=10), axis.text.y = element_text(size=7),
+          legend.position = 'none'))
+```
+
+```{r}
+df_exp_by_chemostat <- rbind(mcmc_exp_by_chemostat[[1]], mcmc_exp_by_chemostat[[2]],
+                             mcmc_exp_by_chemostat[[3]], mcmc_exp_by_chemostat[[4]]) %>%
+  as.data.frame %>% tidyr::gather("parameter", "value")
+
+df_exp_by_chemostat <- df_exp_by_chemostat[grep("alpha", df_exp_by_chemostat$parameter),]
+df_exp_by_chemostat$chemostat <- gsub("\\D", "", df_exp_by_chemostat$parameter)
+df_exp_by_chemostat$parameter <- gsub("\\[.\\]", "", df_exp_by_chemostat$parameter) %>%
+  factor(levels = c("alpha_w", "alpha_m"))
+df_exp_by_chemostat$prev0 <- data$prev0[match(paste0("chem", df_exp_by_chemostat$chemostat),
+                                              data$chemostat)] %>%
+  factor(labels=c("Epidemic","Endemic"))
+
+(Fig_by_chemostat <- ggplot(df_exp_by_chemostat, aes(x=chemostat, y=value, col=parameter)) +
+    facet_grid(~prev0, scales = "free_x") +
+    geom_violin(aes(fill=parameter), col='white', alpha=0.25, position = position_dodge(0.3)) +
+    geom_boxplot(outlier.size=0.15, fill=NA, cex=0.4, width=0.4, position = position_dodge(0.3)) +
+    labs(x="chemostat n°", y="Estimated value\n") +
+    scale_color_manual(values=colors, label=c(expression(alpha[w]), expression(alpha[m]))) +
+    scale_fill_manual(values=colors, label=c(expression(alpha[w]), expression(alpha[m]))) +
+    scale_y_continuous(breaks=seq(0,7E-2,1E-2), labels=scientific_10) +
+    theme_bw() +
+    theme(axis.title.x = element_text(size=10), axis.text.x = element_text(size=7),
+          axis.title.y = element_text(size=10), axis.text.y = element_text(size=7),
+          legend.title = element_blank(), legend.position = c(0.91,0.85),
+          legend.background = element_rect(colour='black', linewidth = 0.3)))
+```
+
+```{r, fig.width=9, fig.height=4}
+plot_grid(Fig, Fig_by_chemostat,
+          rel_widths = c(0.35,0.65), labels=paste0(LETTERS[1:2],")"))
+```

@@ -1,0 +1,254 @@
+---
+title: 'Project \(\lambda\) - statistical inference of the rates of prophage reactivation (frequentist approach)'
+author: "Wakinyan B."
+date: "07 April 2023"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+    number_sections: yes
+    highlight: tango
+  html_document:
+    toc: yes
+    toc_depth: '4'
+    df_print: paged
+header-includes:
+- \usepackage{stmaryrd}
+encoding: UTF-8
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      fig.align = "center",
+                      message = FALSE,
+                      warning = FALSE,
+                      results = 'show')
+
+knitr::opts_knit$set(root.dir='C:/Users/wbenhamou/Desktop/LAMBDA/Data_and_codes/')
+```
+\newpage
+
+```{r, results='hide'}
+rm(list=ls()) # Cleaning objects from the global environment
+
+# Packages (may first require installations: install.packages())
+library(tidyverse) # for data manipulation, graphic visualizations, ...
+library(plyr) # for data manipulation
+library(scales) # to manipulate the internal scaling infrastructure used by ggplot2
+library(ggbreak)
+library(RColorBrewer) # for colors and palettes
+library(gridExtra) # to show multiple plots
+library(cowplot) # to show multiple plots
+library(grid)
+library(ggpubr) # to show multiple plots with a common legend
+library(deSolve) # to solve a system of ordinary differential equations
+library(boot) # for the logit and inverse logit function ('logit' and 'inv.logit')
+library(knitr) # for function 'kable' (a table generator)
+library(corrplot) # for plotting correlation matrices
+library(lme4)
+library(msm)
+
+# Execute functions from external R script
+source("Phage_Lambda_functions_v11.R")
+
+Sys.setlocale("LC_TIME", "English")
+```
+
+# Numerical simulation
+
+```{r}
+# Simulate data for 2 treatments (epidemic vs endemic) x 4 chemostats each,
+# with sampling every 6 min (0.1 h) and without measurement errors.
+
+# Time points
+times <- seq(0, 60, 0.1)
+n_times <- length(times)
+
+# Parameters
+
+## Initial values
+prev0_epidemic <- 0.01
+prev0_endemic <- 0.99
+freq0 <- 0.5
+
+# Other parameters
+alpha_w <- 7e-03
+alpha_m <- 2e-02
+phi_w <- 2e-01
+phi_m <- 2e-02
+a <- 3e-09
+b <- 0.1
+B <- 80
+r <- 1.4
+tau <- 1.5 # lysis delay = 40 min
+K <- 1e+09
+m <- 0.8
+
+parms <- c("prev0_epidemic" = prev0_epidemic, "prev0_endemic" = prev0_endemic, "freq0" = freq0,
+           "alpha_w" = alpha_w, "alpha_m" = alpha_m, "phi_w" = phi_w, "phi_m" = phi_m,
+           "a" = a, "b" = b, "B" = B, "r" = r, "tau" = tau)
+
+## Numerical simulations
+
+simul <- rbind(lambda_simul(prev0 = parms[["prev0_epidemic"]], freq0 = parms[["freq0"]],
+                            parms = parms, times = times),
+               lambda_simul(prev0 = parms[["prev0_endemic"]], freq0 = parms[["freq0"]],
+                            parms = parms, times = times))
+simul$prev0 <- c(1, 100) %>% rep(each = n_times)
+```
+
+# Statistical inference
+
+## From simulated data
+
+```{r}
+d <- data.frame()
+Q_endemic <- data.frame()
+
+n <- nrow(simul)
+simul$chemostat <- paste0("chem_", simul$prev0)
+
+I <- simul[simul$time==60 & simul$prev0==100,]$Infected
+
+simul_norm <- simul
+
+set.seed(333)
+
+for(i in 1:1000){
+  
+  for(sd in c(0.01,0.5)){
+  
+    # Sampling effort = 10 h^-1
+    
+    simul_norm$logit_prev <- simul$logit_prev + rnorm(n,0,sd)
+    simul_norm$logit_g <- simul$logit_g + rnorm(n,0,sd)
+    simul_norm$logit_q <- simul$logit_q + rnorm(n,0,sd)
+    
+    estim <- estim_alpha(simul_norm, threshold_prev=0.95, by_chemostat=FALSE)
+    #Q_endemic_estim <- mean(simul_norm)
+  
+    d <- rbind(d, data.frame("Eff"=10, sd, c("Q", "Delta_alpha","alpha_w", "alpha_m"),
+                             c(estim$Q, estim$Delta_alpha, estim$alpha_w, estim$alpha_m)))
+    
+    # Sampling effort = 1 h^-1
+    
+    simul_norm2 <- subset(simul_norm, time %in% 1:60)
+    
+    estim <- estim_alpha(simul_norm2, threshold_prev=0.95, by_chemostat=FALSE)
+    #Q_endemic_estim <- mean(simul_norm)
+  
+    d <- rbind(d, data.frame("Eff"=1, sd, c("Q", "Delta_alpha","alpha_w", "alpha_m"),
+                             c(estim$Q, estim$Delta_alpha, estim$alpha_w, estim$alpha_m)))
+  }
+}
+
+colnames(d) <- c("sampling_effort", "sd", "parameter", "value")
+```
+
+```{r, fig.height=3.5, fig.width=7}
+ylim <- c(0, 4E-2)
+mytheme <- theme_bw() + theme(axis.title.x = element_blank(),
+                              axis.text.x = element_text(size=11),
+                              axis.title.y = element_text(size=10),
+                              axis.text.y = element_text(size=9),
+                              legend.title = element_text(size=8),
+                              title=element_text(size=7))
+
+d2 <- d[grep("^alpha", d$parameter),]
+d2$parameter <- factor(d2$parameter, levels = c("alpha_w", "alpha_m")) 
+
+plot_grid(
+  ggplot(subset(d2, sampling_effort==10), aes(x=parameter, y=value, col=as.factor(sd))) +
+    geom_hline(yintercept = c(alpha_w, alpha_m), lty='dashed') +
+    geom_jitter(size=0.8, width=0.25, alpha=0.2) +
+    scale_y_continuous(limits=ylim) +
+    labs(title=expression(bold(paste("Sampling effort = 10 ", h^{-1}))),
+                         y='Estimated value\n', col='Standard deviation\nof measurement error') +
+    scale_x_discrete(label=c(expression(hat(alpha)[w]), expression(hat(alpha)[m]))) +
+    scale_color_manual(values = c("#08306B","#AED4E7")) +
+    annotate(geom='text', x=2.48, y=c(alpha_w, alpha_m)+1.5E-3, size=3.5,
+           label=c(expression(alpha[w]), expression(alpha[m]))) +
+    mytheme + theme(legend.position='none'),
+  
+  ggplot(subset(d2, sampling_effort==1), aes(x=parameter, y=value, col=as.factor(sd))) +
+    geom_hline(yintercept = c(alpha_w, alpha_m), lty='dashed') +
+    geom_jitter(size=0.8, width=0.25, alpha=0.3) +
+    scale_y_continuous(limits=ylim) +
+    labs(title=expression(bold(paste("Sampling effort = 1 ", h^{-1}))),
+         y='Estimated value\n', col='Standard deviation\nof measurement error') +
+    scale_x_discrete(label=c(expression(hat(alpha)[w]), expression(hat(alpha)[m]))) +
+    scale_color_manual(values = c("#08306B", "#AED4E7")) +
+    annotate(geom='text', x=2.5, y=c(alpha_w, alpha_m)+1.5E-3, size=3.5,
+           label=c(expression(alpha[w]), expression(alpha[m]))) +
+    mytheme +
+    theme(axis.title.y=element_blank(),
+          legend.position = c(0.24,0.8), legend.background=element_rect(colour='black', linewidth=0.3)) +
+    guides(color=guide_legend(override.aes = list(size=1.5, alpha=1))),
+  align='hv', ncol=2, nrow=1, rel_widths=c(0.55,0.65), labels=paste0(LETTERS[1:2],")"))
+```
+
+# From experimental data
+
+## Import
+
+```{r}
+data_FACS <- read.csv("Data/data_FACS.csv", header = TRUE)
+data_qPCR <- read.csv("Data/data_qPCR.csv", header = TRUE)
+
+data <- merge.data.frame(data_FACS[,c(1:3,9:12)], data_qPCR[,c(1:3,6,8)], all=TRUE)
+data$lnQ <- data$logit_q-data$logit_g
+data$Q <- exp(data$lnQ)
+
+# Mean over time across replicates (chemostats with same treatment (epidemic vs. endemic))
+
+data_mean <- data %>% plyr::ddply(~prev0+time, function(X){
+  return(apply(X[,-1], 2, mean, na.rm=TRUE) %>% data.frame %>% t %>%
+    data.frame("chemostat"=gsub("chem","-",X$chemostat) %>% paste0(collapse='') %>% paste0("chem",.),.))
+})
+```
+
+## Plot differentiation between free phages and infected hosts
+
+```{r, echo=FALSE, fig.width=5, fig.height=3.5}
+data.endemic <- ddply(data, ~chemostat, function(X){
+  tmin <- X$time[which(X$logit_prev>=logit(0.95))[1]]
+  return(subset(X, time>=tmin))})
+
+data_mean.endemic <- data.endemic %>% plyr::ddply(~prev0+time, function(X){
+  return(apply(X[,-1], 2, mean, na.rm=TRUE) %>% data.frame %>% t %>%
+  data.frame("chemostat"=gsub("chem","-",X$chemostat) %>% paste0(collapse='') %>% paste0("chem",.),.))
+})
+
+ggplot(data[!is.na(data$Q),], aes(x=time, y=Q, col=as.factor(prev0), group=chemostat)) +
+  
+  geom_hline(yintercept=exp(mean(data.endemic$lnQ, na.rm=TRUE)), cex=0.4, lty=5) +
+  geom_hline(yintercept=1, cex=0.5, col='grey70') +
+  
+  geom_line(cex=0.2, alpha=0.3) +
+  geom_line(data=data_mean[!is.na(data_mean$lnQ),], aes(y=exp(lnQ)), cex=1.3, alpha=0.2) +
+  
+  geom_line(data=data.endemic[!is.na(data.endemic$Q),], cex=0.3) +
+  geom_line(data=data_mean.endemic[!is.na(data_mean.endemic$lnQ),], aes(y=exp(lnQ), group=prev0), cex=1.3, alpha=0.6)+
+  
+  scale_color_manual(labels=c("epidemic", "endemic"), values=c('#DA0F0F', '#0E5DD6')) +
+  labs(x="time (hours)", y="Differentiation of virulent strain\nbetween free phages and infected cells", col="Treatment:") +
+  scale_x_continuous(limits = c(0,45), breaks = seq(0,45,5)) +
+  scale_y_log10() + annotation_logticks(sides = "l") +
+  mytheme + theme(legend.title=element_blank(), legend.position=c(0.86,0.86))
+
+# ggsave("Differentiation_exp.tiff", width=5, height=3.5, dpi=800)
+```
+
+## Point estimates (all chemostats combined)
+
+```{r}
+(estim_alpha_experiment <- estim_alpha(data, by_chemostat=FALSE))
+```
+
+
+
+
+
+
