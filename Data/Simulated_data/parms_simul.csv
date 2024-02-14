@@ -1,0 +1,2 @@
+"prev0_epidemic","prev0_endemic","freq0","alpha_w","alpha_m","phi_w","phi_m","a","b","B","r","tau"
+0.01,0.99,0.5,0.007,0.02,0.2,0.02,3e-09,0.1,80,1.4,1.5
