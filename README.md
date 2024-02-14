@@ -115,7 +115,7 @@ We then used experimental data, starting from one set of 2,000 initial condition
 - **Estim_nmk_parallel_experimental_data_nstarts2000_B80_v11.csv**
 - **Best_parms_non_linear_optim_experimental_data.csv** (best fit from the previous file)
 
-### Sensitivity analysis
+### Sensitivity analyses
 
 To test the impact of the fixed value used for the burst size $B$, we studied how perturbations of the original value (80 phages/cell) affected the estimation of the other parameter values (new point estimates from non-linear optimizations).
 
