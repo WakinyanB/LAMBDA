@@ -149,6 +149,6 @@ Likewise, we did the same with parameter $r$, which was also first poorly estima
 - **Estim_nmk_parallel_experimental_data_bootstrap_B80_v11.csv** (joint distributions of estimated parameters)
 - **Simulations_bootstrap.csv** (fitted simulations)
 
-### Log-likelihood landscape of $b$ *vs* $B$
+### Log-likelihood landscape of $b$ *vs.* $B$
 
 - **Lambda_landscape_b_B_v11_n40401_maxfeval8000.csv**
