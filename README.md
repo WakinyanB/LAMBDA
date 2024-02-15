@@ -7,9 +7,9 @@ Wakinyan Benhamou, François Blanquart, Marc Choisy, Thomas W. Berngruber, Rémi
 
 ## Data (source and short descriptions)
 
-This is previous experimental time series from [[Berngruber *et al.*, 2013](https://doi.org/10.1371/journal.ppat.1003209)] or simulated data from this study. All data used in the scripts are in the 'Data' folder and, within, simulated datasets are in the 'Simulated_data' subfolder.
+This is previous experimental time series from [Berngruber *et al.* (2013)](https://doi.org/10.1371/journal.ppat.1003209) or simulated data from this study. All data used in the scripts are in the 'Data' folder and, within, simulated datasets are in the 'Simulated_data' subfolder.
 
-The evolution experiment designed in [[Berngruber *et al.*, 2013](https://doi.org/10.1371/journal.ppat.1003209)] monitored the competition between two strains of phage $\lambda$ with distinct life-history strategies in continuous cultures of *Escherichia coli*. The first strain is the wildtype which is known to have a relatively large lysogenization rate and low reactivation rate. The second strain is the $\lambda$ cI857 variant, which is known to be more virulent and transmitted mostly horizontally through lytic cycles. There are 8 chemostats: 4 replicates x 2 treatments (epidemic, with an initial prevalence around 1% *vs.* endemic, with an initial prevalence around 99%). Viruses are first introduced as prophages with initial ratio 1:1.
+The evolution experiment designed in [Berngruber *et al.* (2013)](https://doi.org/10.1371/journal.ppat.1003209) monitored the competition between two strains of phage $\lambda$ with distinct life-history strategies in continuous cultures of *Escherichia coli*. The first strain is the wildtype which is known to have a relatively large lysogenization rate and low reactivation rate. The second strain is the $\lambda$ cI857 variant, which is known to be more virulent and transmitted mostly horizontally through lytic cycles. There are 8 chemostats: 4 replicates x 2 treatments (epidemic, with an initial prevalence around 1% *vs.* endemic, with an initial prevalence around 99%). Viruses are first introduced as prophages with initial ratio 1:1.
 
 ### data_FACS.csv
 
