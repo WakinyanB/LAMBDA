@@ -1,8 +1,7 @@
 # LAMBDA
 
-Data & Codes for:<br>
-**Evolution of Virulence in Emerging Epidemics: From Theory to Experimental Evolution and Back**
-
+Data & Codes for:<br><br>
+**Evolution of Virulence in Emerging Epidemics: From Theory to Experimental Evolution and Back**<br>
 Wakinyan Benhamou, François Blanquart, Marc Choisy, Thomas W. Berngruber, Rémi Choquet and Sylvain Gandon
 
 ## Data (source and short descriptions)
