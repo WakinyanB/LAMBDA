@@ -46,7 +46,7 @@ Scripts in the root directory:
 - **Experimental_data_mean_and_figures.R** (generates **Experimental_data_mean_and_figures.RData**, *cf.* see above)
 - **Phage_Lambda_functions_v11.R** (script with all the main custom functions used in this study)
 - **Simulate_Data.R** (simulates all the datasets present in 'Data/Simulated_data', *cf.* see above)
-- **Theoretical_figures.R** (plots theoretical figures Fig. XXX, XXX)
+- **Theoretical_figures.R** (plots theoretical figures Fig. 2, S1, S3, S4 and S13)
 
 We developed an inference approach to estimate the parameters of the model. We implemented a two-step MLE (Maximum Likelihood Estimation) procedure: (i) we first obtained point estimates of the rates of prophage reactivation $\alpha_w$ and $\alpha_m$ of both viral strains, (ii) then we fixed $\alpha_w$ and $\alpha_m$ to their point estimates and we ran non-linear optimizations to infer the remaining parameters of the model (except the burst size $B$ which had to be fixed because of an identifiability issue).
 
@@ -55,8 +55,8 @@ We developed an inference approach to estimate the parameters of the model. We i
 Statistical inference of the rates of prophage reactivation $\alpha_w$ and $\alpha_m$.
 
 Scripts:
-- **Inference_rates_of_prophage_reactivation_frequentist.Rmd** (frequentist inference of $\alpha_w$ and $\alpha_m$ (point estimates) from both simulated and experimental data; plots Fig. SXXX)
-- **Inference_rates_of_prophage_reactivation_Bayesian.Rmd** (Bayesian inference of $\alpha_w$ and $\alpha_m$ from experimental data; plots Fig. SXXX)
+- **Inference_rates_of_prophage_reactivation_frequentist.Rmd** (frequentist inference of $\alpha_w$ and $\alpha_m$ (point estimates) from both simulated and experimental data; plots Fig. S5)
+- **Inference_rates_of_prophage_reactivation_Bayesian.Rmd** (Bayesian inference of $\alpha_w$ and $\alpha_m$ from experimental data; plots Fig. S14)
 
 RData:
 - **RJAGS_MCMC.RData** (Monte Carlo Markov Chains simulations from **Inference_rates_of_prophage_reactivation_Bayesian.Rmd**)
@@ -74,7 +74,7 @@ Scripts:
 - **estim_simulated_data_2_v11.R** (runs non-linear optimizations with simulated datasets 2)
 - **estim_simulated_data_3_v11.R** (runs non-linear optimizations with simulated datasets 3)
 - **estim_simulated_data_4_v11.R** (runs non-linear optimizations with simulated datasets 4)
-- **Phage_lambda_simulated_data_nmk_v11.Rmd** (processes the results of the previous scripts, plots Fig. SXXX)
+- **Phage_lambda_simulated_data_nmk_v11.Rmd** (processes the results of the previous scripts, plots Fig. S7)
 
 ##### LogLikelihood_landscape_b_B/
 
@@ -82,7 +82,7 @@ To show that parameters $B$ and $b$ were not separately identifiable, we compute
 
 Scripts:
 - **LogLikelihood_landscape_b_B.R** (computes the log-likelihood for numerous combinations of $\\{b,B\\}$ from the simulated dataset closest to the original simulation (1))
-- **LogLikelihood_landscape_b_B_figure.R** (plots Fig. SXXX)
+- **LogLikelihood_landscape_b_B_figure.R** (plots Fig. S6)
 
 #### From_experimental_data/
 
@@ -92,7 +92,7 @@ Scripts:
 - **estim_experimental_data_v11_vara.R** (runs non-linear optimizations with experimental data for different fixed values of $a$ (sensitivity analysis))
 - **estim_experimental_data_v11_varr.R** (runs non-linear optimizations with experimental data for different fixed values of $r$ (sensitivity analysis))
 - **estim_experimental_data_bootstrap_v11.R** (runs non-linear optimizations for 10,000 bootstraped datasets to compute joint distributions of estimated parameters)
-- **Phage_lambda_experimental_data_nmk_v11.Rmd** (processes the results of all the previous scripts; fits ARMA models to residuals and generates bootstraped datasets; and plots Fig. XXX)
+- **Phage_lambda_experimental_data_nmk_v11.Rmd** (processes the results of all the previous scripts; fits ARMA models to residuals and generates bootstraped datasets; and plots Fig. 4, S8, S9, S10, S11, S12)
 
 ## Outputs (csv files)
 
