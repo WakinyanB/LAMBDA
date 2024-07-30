@@ -1,0 +1,335 @@
+---
+title: 'Project \(\lambda\) - simulation study'
+author: "Wakinyan B."
+date: "07 April 2023"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+    number_sections: yes
+    highlight: tango
+  html_document:
+    toc: yes
+    toc_depth: '4'
+    df_print: paged
+header-includes:
+- \usepackage{stmaryrd}
+encoding: UTF-8
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      fig.align = "center",
+                      message = FALSE,
+                      warning = FALSE,
+                      results = 'show')
+
+knitr::opts_knit$set(root.dir='C:/Users/wbenhamou/Desktop/LAMBDA/Data_and_codes/')
+```
+\newpage
+
+```{r, results='hide'}
+rm(list=ls()) # Cleaning objects from the global environment
+
+# Packages (may first require installations: install.packages())
+library(tidyverse) # for data manipulation, graphic visualizations, ...
+library(plyr) # for data manipulation
+library(scales) # to manipulate the internal scaling infrastructure used by ggplot2
+library(ggbreak)
+library(RColorBrewer) # for colors and palettes
+library(gridExtra) # to show multiple plots
+library(cowplot) # to show multiple plots
+library(grid)
+library(ggpubr) # to show multiple plots with a common legend
+library(deSolve) # to solve a system of ordinary differential equations
+library(boot) # for the logit and inverse logit function ('logit' and 'inv.logit')
+
+# Execute functions from external R script
+source("Phage_Lambda_functions_v11.R")
+
+Sys.setlocale("LC_TIME", "English")
+```
+
+# Simulated data
+
+```{r}
+load("Data/Simulated_data/simul_data.RData")
+```
+
+## Plots
+
+```{r, fig.width = 16, fig.height = 10}
+plot_simul_data <- function(simul, simul_data_FACS, simul_data_qPCR, alpha=0.1){
+  return(
+    plot_grid(
+      ggplot(data=simul, aes(x=time, y=logit_prev, color=as.factor(prev0))) +
+      geom_line(cex=0.5, lty='dashed', lwd=0.4) +
+      geom_point(data=simul_data_FACS, aes(x=time, y=logit_prev), cex=0.7, alpha = alpha) +
+      scale_color_manual(labels=c("epidemic", "endemic"), values=c('#DA0F0F', '#0E5DD6')) +
+      labs(x="time (hours)", y="Logit-prevalence\n") +
+      scale_x_continuous(limits=c(0,60), breaks=seq(0, 60, 10)) +
+      scale_y_continuous(labels=scales::label_number(accuracy=1)) +
+      theme_bw() + theme(axis.text.x=element_text(size=11), axis.text.y=element_text(size=11),
+                         legend.position='none', axis.title.x=element_blank()),
+    
+    ggplot(data=simul, aes(x=time, y=logit_g, color=as.factor(prev0))) +
+      geom_line(cex=0.5, lty='dashed', lwd=0.4) +
+      geom_point(data=simul_data_FACS, aes(x=time, y=logit_g), cex=0.7, alpha = alpha) +
+      scale_color_manual(labels=c("epidemic", "endemic"), values=c('#DA0F0F', '#0E5DD6')) +
+      labs(x="time (hours)", y="Logit-frequency infected by virulent phage\n") +
+      scale_x_continuous(limits=c(0,60), breaks=seq(0, 60, 10)) +
+      scale_y_continuous(labels=scales::label_number(accuracy=1)) +
+      theme_bw() + theme(axis.text.x=element_text(size=11), axis.text.y=element_text(size=11),
+                         legend.position='none', axis.title.x=element_blank()),
+    
+    ggplot(data=simul, aes(x=time, y=logit_q, color=as.factor(prev0))) +
+      geom_line(cex=0.5, lty='dashed', lwd=0.4) +
+      geom_point(data=simul_data_qPCR, aes(x=time, y=logit_q), cex=0.7, alpha = alpha) +
+      scale_color_manual(labels=c("epidemic", "endemic"), values=c('#DA0F0F', '#0E5DD6')) +
+      labs(x="time (hours)", y="Logit-frequency free virulent phage\n") +
+      scale_x_continuous(limits=c(0,60), breaks=seq(0, 60, 10)) +
+      scale_y_continuous(labels=scales::label_number(accuracy=1)) +
+      theme_bw() + theme(axis.text.x=element_text(size=11),
+                         axis.text.y=element_text(size=11),
+                         legend.position='none'),
+    ncol=1, nrow=3)
+  )
+}
+
+plot_grid(
+  get_legend(ggplot(simul_data_FACS.1, aes(x=time, y=logit_prev, col=as.factor(prev0))) +
+               geom_point(cex=2.5) + geom_line(lwd=1, lty='dashed', lwd=0.4) +
+               scale_color_manual(labels=c("epidemic", "endemic"), values=c('#DA0F0F', '#0E5DD6')) +
+               theme_classic() + theme(legend.title = element_blank(), legend.position = 'top',
+                                       legend.text = element_text(size=12))),
+  plot_grid(
+    plot_simul_data(simul, simul_data_FACS.1, simul_data_qPCR.1, alpha=0.4),
+    plot_simul_data(simul, simul_data_FACS.2, simul_data_qPCR.2, alpha=0.075),
+    plot_simul_data(simul, simul_data_FACS.3, simul_data_qPCR.3, alpha=0.2),
+    plot_simul_data(simul, simul_data_FACS.4, simul_data_qPCR.4, alpha=0.2),
+    align='hv', nrow=1, ncol=4, labels = LETTERS[1:4]),
+  
+  ncol=1, rel_heights = c(0.1,0.9))
+```
+
+# Statistical inference
+
+## Estimation of rates of prophage reactivation
+
+```{r}
+alpha.1 <- estim_alpha(data=merge.data.frame(simul_data_FACS.1, simul_data_qPCR.1, all=TRUE), by_chemostat=FALSE)
+alpha.2 <- estim_alpha(data=merge.data.frame(simul_data_FACS.2, simul_data_qPCR.2, all=TRUE), by_chemostat=FALSE)
+alpha.3 <- estim_alpha(data=merge.data.frame(simul_data_FACS.3, simul_data_qPCR.3, all=TRUE), by_chemostat=FALSE)
+alpha.4 <- estim_alpha(data=merge.data.frame(simul_data_FACS.4, simul_data_qPCR.4, all=TRUE), by_chemostat=FALSE)
+
+alpha <- data.frame("alpha_w" = c(alpha.1$alpha_w, alpha.2$alpha_w, alpha.3$alpha_w, alpha.4$alpha_w),
+                    "alpha_m" = c(alpha.1$alpha_m, alpha.2$alpha_m, alpha.3$alpha_m, alpha.4$alpha_m),
+                    "sd" = rep(c(0.01, 0.5), 2), "sampling_effort" = rep(c(10, 1),each=2))
+```
+
+## Estimation of the remaining parameters
+
+Run R scripts:
+
+- estim_simulated_data_1_v11.R
+- estim_simulated_data_2_v11.R
+- estim_simulated_data_3_v11.R
+- estim_simulated_data_4_v11.R
+
+```{r}
+path <- "Outputs_csv/Estim_nmk_parallel_simulated_data_"
+
+estim_df.1 <- read.csv(paste0(path, "sd_noise_001_timestep_01_n5x2000_seed123_v11.csv"), header=TRUE)
+estim_df.2 <- read.csv(paste0(path, "sd_noise_05_timestep_01_n5x2000_seed123_v11.csv"), header=TRUE)
+estim_df.3 <- read.csv(paste0(path, "sd_noise_001_timestep_1_n5x2000_seed123_v11.csv"), header=TRUE)
+estim_df.4 <- read.csv(paste0(path, "sd_noise_05_timestep_1_n5x2000_seed123_v11.csv"), header=TRUE)
+
+estim_df.1$id <- 1
+estim_df.2$id <- 2
+estim_df.3$id <- 3
+estim_df.4$id <- 4
+
+estim_df.1$sampling_effort <- 10
+estim_df.2$sampling_effort <- 10
+estim_df.3$sampling_effort <- 1
+estim_df.4$sampling_effort <- 1
+
+estim_df.1$sd <- 0.01
+estim_df.2$sd <- 0.5
+estim_df.3$sd <- 0.01
+estim_df.4$sd <- 0.5
+
+estim_df.1$set <- rep(1:5, each=2000)
+estim_df.2$set <- rep(1:5, each=2000)
+estim_df.3$set <- rep(1:5, each=2000)
+estim_df.4$set <- rep(1:5, each=2000)
+```
+
+```{r}
+best <- rbind(estim_df.1, estim_df.2, estim_df.3, estim_df.4) %>%
+  ddply(~id, function(tab){
+    return(ddply(tab, ~set, function(X){
+      X <- subset(X, Convergence=="Successful completion")
+      return(X[which.min(X$Value),])
+    }))
+  })
+```
+
+```{r}
+mytheme <- theme_bw() + theme(axis.title.x = element_text(size=9), axis.text.x = element_text(size=9),
+                              axis.title.y = element_text(size=9), axis.text.y = element_text(size=8),
+                              plot.margin = margin(0,0,0,0))
+
+Fig_alpha_w <- ggplot(alpha, aes(x=as.factor(sampling_effort), y=alpha_w, col=as.factor(sd))) +
+  geom_hline(yintercept = parms[["alpha_w"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=2, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  scale_y_continuous(limits=c(5E-3,9E-3), labels=scientific_10) +
+  scale_y_continuous(limits=c(5E-3,9E-3), labels=scientific_10) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(alpha[w]), size=5, x=2.3, y=8.5E-3, hjust=0) +
+  mytheme
+
+Fig_alpha_m <- ggplot(alpha, aes(x=as.factor(sampling_effort), y=alpha_m, col=as.factor(sd))) +
+  geom_hline(yintercept = parms[["alpha_m"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=2, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  scale_y_continuous(limits=c(1.25E-2,2.75E-2), breaks=seq(1.5E-2,2.5E-2,5E-3), labels=scientific_10) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(alpha[m]), size=5, x=2.3, y=2.6E-2, hjust=0) +
+  mytheme
+
+Fig_prev0_epidemic <- ggplot(best, aes(x=as.factor(sampling_effort), y=prev0_epidemic, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$prev0_epidemic[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$prev0_epidemic[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["prev0_epidemic"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value", labels=scientific_10) +
+  # scale_y_continuous(limits=c(0,3E-2)) +
+  scale_y_continuous(limits=bounds$prev0_epidemic, breaks=c(bounds$prev0_epidemic[1],
+                                                            seq(5E-3,bounds$prev0_epidemic[2],5E-3))) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(P[0]^{epidemic}), size=3.5, x=1, y=5E-3, hjust=1) +
+  mytheme
+  
+Fig_prev0_endemic <- ggplot(best, aes(x=as.factor(sampling_effort), y=prev0_endemic, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$prev0_endemic[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$prev0_endemic[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["prev0_endemic"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(limits=c(0.985,0.995), breaks=c(0.985,0.99, 0.995)) +
+  scale_y_continuous(limits=bounds$prev0_endemic) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(P[0]^{endemic}), size=3.5, x=1, y=0.96, hjust=1) +
+  mytheme
+  
+Fig_freq0 <- ggplot(best, aes(x=as.factor(sampling_effort), y=freq0, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$freq0[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$freq0[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["freq0"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(breaks=c(0.45,0.5,0.55), limits=c(0.45,0.55)) +
+  scale_y_continuous(limits=bounds$freq0) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(p[0]), size=4, x=2.3, y=0.57, hjust=0) +
+  mytheme
+  
+Fig_phi_w <- ggplot(best, aes(x=as.factor(sampling_effort), y=phi_w, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$phi_w[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$phi_w[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["phi_w"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(limits=c(0,0.45)) +
+  scale_y_continuous(limits=bounds$phi_w) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(phi[w]), size=5, x=2.3, y=0.8, hjust=0) +
+  mytheme
+
+Fig_phi_m <- ggplot(best, aes(x=as.factor(sampling_effort), y=phi_m, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$phi_m[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$phi_m[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["phi_m"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(limits=c(0,4E-2), labels=scientific_10) +
+  scale_y_continuous(limits=bounds$phi_m) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(phi[m]), size=5, x=2.3, y=0.8, hjust=0) +
+  mytheme
+  
+Fig_a <- ggplot(best, aes(x=as.factor(sampling_effort), y=a, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=log10(bounds$a[1]), col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=log10(bounds$a[2]), ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["a"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(limits=c(0,6E-9), labels=scientific_10) +
+  scale_y_continuous(limits=bounds$a, labels=scientific_10, trans='log10') +
+  annotation_logticks(side='l', size=.01) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(a), size=4.5, x=2.3, y=4E-7, hjust=0) +
+  mytheme
+  
+Fig_b <- ggplot(best, aes(x=as.factor(sampling_effort), y=b, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$b[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$b[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["b"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(limits=c(0.05,0.2)) +
+  scale_y_continuous(limits=bounds$b) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(b), size=4.5, x=2.3, y=0.9*0.2, hjust=0) +
+  mytheme
+  
+Fig_r <- ggplot(best, aes(x=as.factor(sampling_effort), y=r, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$r[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$r[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["r"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")),
+       y="Estimated value\n\n\n", col="Standard deviation\nof measurement errors") +
+  scale_y_continuous(limits=bounds$r) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(r), size=5, x=2.3, y=0.9*5, hjust=0) +
+  mytheme
+  
+Fig_tau <- ggplot(best, aes(x=as.factor(sampling_effort), y=tau, col=as.factor(sd))) +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=-Inf, ymax=bounds$tau[1], col=NA, fill='grey85') +
+  geom_rect(xmin=-Inf, xmax=+Inf, ymin=bounds$tau[2], ymax=+Inf, col=NA, fill='grey85') +
+  geom_hline(yintercept = parms[["tau"]], lty='dashed', lwd=0.4) +
+  geom_jitter(cex=1, width=0.1) +
+  labs(x=expression(paste("Sampling effort (",h^{-1},")")), y="Estimated value") +
+  # scale_y_continuous(limits=c(0,5)) +
+  scale_y_continuous(limits=bounds$tau, breaks=c(bounds$tau[1],1.5:3.5,bounds$tau[2])) +
+  scale_color_manual(values = c("#08306B", "#AED4E7")) +
+  annotate(geom='text', label=expression(tau), size=5, x=2.3, y=0.9*4, hjust=0) +
+  mytheme
+```
+
+```{r, fig.height=9, fig.width=6}
+plot_grid(
+  plot_grid(
+    Fig_alpha_w + theme(legend.position='none', axis.title.x=element_blank()),
+    Fig_alpha_m + theme(legend.position='none', axis.title.y=element_blank(), axis.title.x=element_blank()),
+    Fig_phi_w + theme(legend.position='none', axis.title.x=element_blank()),
+    Fig_phi_m + theme(legend.position='none', axis.title.y=element_blank(), axis.title.x=element_blank()),
+    Fig_prev0_epidemic + theme(legend.position='none', axis.title.x=element_blank()),
+    Fig_prev0_endemic + theme(legend.position='none', axis.title.y=element_blank(), axis.title.x=element_blank()),
+    Fig_freq0 + theme(legend.position='none', axis.title.x=element_blank()),
+    Fig_a + theme(legend.position='none', axis.title.y=element_blank(), axis.title.x=element_blank()),
+    Fig_b + theme(legend.position='none', axis.title.x=element_blank()),
+    Fig_tau + theme(legend.position='none', axis.title.y=element_blank()),
+    align='hv', ncol = 2),
+  plot_grid(Fig_r + theme(legend.position='none'),
+            get_legend(Fig_r + theme(legend.title = element_text(size=10),
+                                     legend.background=element_rect(colour='black', linewidth=0.3)) +
+                         guides(color=guide_legend(override.aes = list(size=2))))),
+  ncol=1, rel_heights=c(5,1))
+```
+
