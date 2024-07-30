@@ -253,7 +253,7 @@ scientific_10 <- function(x){
     guides(alpha=FALSE)) # 4 x 7
 
 plot_grid(Fig_densities, Fig_freq.2, rel_heights = c(0.55,0.45),
-          labels = paste0(LETTERS[1:2],")"), ncol = 1) # portrait : 8 x 7
+          labels = LETTERS[1:2], ncol = 1, label_size = 18) # portrait : 8 x 7
 
 logit_g.30 <- subset(simul, treatment=='epidemic' & time==30)$logit_g
 logit_g.50 <- subset(simul, treatment=='epidemic' & time==50)$logit_g
@@ -458,8 +458,8 @@ approx_logit_f$logit_q.2 <- simul2$logit_q[t0_index]+approx_slope_logit_f[2]*(ap
 
 plot_grid(Fig_approx_vs_Delta_phi,
           plot_grid(Fig_ratio, Fig_approx_slope + theme(legend.position = 'none'),
-                    align='v', ncol=1, rel_heights=c(0.45,0.55), labels=paste0(LETTERS[2:3],")")), # pdf 6 x 6
-  ncol = 2, rel_widths=c(0.45,0.55), labels=paste0(LETTERS[1],")")) # pdf landscape 10 x 5
+                    align='v', ncol=1, rel_heights=c(0.45,0.55), labels=LETTERS[2:3], label_size=15), # pdf 6 x 6
+  ncol = 2, rel_widths=c(0.45,0.55), labels=LETTERS[1], label_size=15) # pdf landscape 10 x 5
 
 approx_logit_f$logit_q <- simul2$logit_q[which(simul2$time == t0)[1]]+approx_slope_logit_f[2]*(approx_logit_f$time-t0)
 
@@ -480,19 +480,18 @@ approx_logit_f$logit_q <- simul2$logit_q[which(simul2$time == t0)[1]]+approx_slo
     # geom_segment(data=approx_logit_f, aes(x=time[25], xend=time[25], y=logit_q.2[50], yend=logit_q.2[25]),
     #              col='black', lty='dashed', lwd=0.3) +
     # annotate(geom='text', label=expression(paste(" "%prop%-Delta, phi)), size=5, x=3.1, y=4.7, hjust=0) +
-    mytheme + theme(legend.title = element_blank()) +
-    guides(fill=FALSE))
+    mytheme + theme(legend.position = 'none'))
 
 plot_grid(
   plot_grid(Fig_predict_logit_q + theme(axis.title.x = element_blank(), legend.position = 'none'),
             Fig_predict_logit_g + theme(axis.title.x = element_blank(), legend.position = 'none'),
             Fig_QVL + theme(legend.position = 'none'),
-            align='v', ncol=1, labels=paste0(LETTERS[1:3],")"),
-            label_x=c(0.2, 0.85,0.85), label_y=0.95),
+            align='v', ncol=1, labels=LETTERS[1:3],
+            label_x=c(0.2, 0.9,0.9), label_y=0.95),
   plot_grid(get_legend(Fig_predict_logit_q), get_legend(Fig_predict_logit_g), NULL, ncol=1),
   rel_widths = c(0.8,0.2)) # 8.5 x 6
 
-# ggsave("Theoretical_predictions.tiff", width=6, height=8.5, dpi=800)
+# ggsave("Theoretical_predictions.png", width=6, height=8.5, dpi=800)
 
 # Lysis time distributions
 
@@ -763,7 +762,7 @@ plot_grid(
             Fig_simul.g, Fig_simul.q, ncol=1, align='v'),
   plot_grid(NULL, Fig_PDF, plot_grid(get_legend(Fig_simul.prev), NULL, rel_widths=c(0.4,0.6)),
             rel_heights=c(0.05,0.5,0.45), ncol=1),
-  ncol=2, labels=paste0(LETTERS[1:2], ")"))
+  ncol=2, labels=LETTERS[1:2], label_size=18)
 
 # pdf: landscape 10x8
 
